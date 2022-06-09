@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 HEADER = 64
-PORT = 5050
+PORT = 5000
 # my linux laptop: 192.168.1.45
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
@@ -41,11 +41,15 @@ def handle_client(conn, addr):
                 print(datatypeError)
                 conn.send(datatypeError)
                 break
-            # recieve a message
-            msg = conn.recv(msg_length).decode(FORMAT)
-            print(f"[Message Recieved] {msg}")
+            # recieve the message
+            msg = conn.recv(msg_length)
+            tags = ''
+            # decode if necessary
             if secured:
-                print(f"\n(Decrypted Translation) {fernet.decrypt(msg.decode(FORMAT))}")
+                msg = fernet.decrypt(msg)
+                tags += 'DECRYPTED, '
+            msg = msg.decode(FORMAT)
+            print(f"[Message Recieved ({tags})] {msg}")
             # disconnect
             if msg == DISCONNECT_MESSAGE:
                 connected = False
