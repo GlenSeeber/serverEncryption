@@ -1,5 +1,10 @@
 import socket 
 import threading
+import base64
+import os
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 HEADER = 64
 PORT = 5050
@@ -7,6 +12,8 @@ PORT = 5050
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = 'utf-8'
+KEY_REQUEST = '!SEND_KEY'
+KEY_CONFIRMED = '!KEY_CONFIRMED'
 DISCONNECT_MESSAGE = "!DISCONNECT"
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -15,29 +22,50 @@ server.bind(ADDR)
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
 
+    #have we set up encryption yet
+    secured = False
+    
     connected = True
     while connected:
-        msg_length = conn.recv(HEADER).decode(FORMAT)
-        if msg_length:
-            msg_length = int(msg_length)
-            msg = conn.recv(msg_length).decode(FORMAT)
-            if msg == DISCONNECT_MESSAGE:
-                #connected = False
-                break
+        output = 'DEFAULT_OUTPUT_MESSAGE'
 
-            print(f"[addr: {addr}] msg: {msg}")
+        #check for a header being sent every loop
+        msg_length = conn.recv(HEADER).decode(FORMAT)
+        # if we recieve a transmission
+        if msg_length:
+            #so that the server doesn't crash, it will just cleanly disconnect you
             try:
-                output = int(msg)
+                msg_length = int(msg_length)
             except:
-                if output != DISCONNECT_MESSAGE:
-                    output = "Error: not an integer"
-                else:
-                    output = 'huh'
-            else:
-                output *= output
-                output = str(output)
-            
-            conn.send(output.encode(FORMAT))
+                datatypeError = "incorrect data type sent, disconnecting from client"
+                print(datatypeError)
+                conn.send(datatypeError)
+                break
+            # recieve a message
+            msg = conn.recv(msg_length).decode(FORMAT)
+            print(f"[Message Recieved] {msg}")
+            if secured:
+                print(f"\n(Decrypted Translation) {fernet.decrypt(msg.decode(FORMAT))}")
+            # disconnect
+            if msg == DISCONNECT_MESSAGE:
+                connected = False
+            # request key
+            elif msg == KEY_REQUEST:
+                key = Fernet.generate_key()
+                fernet = Fernet(key)
+                print(f"key generated:\n{key}\n")
+                output = key
+                # we will now be communicating exclusively through encrypted messages
+                secured = True
+            #send the output
+            try:
+                output = output.encode(FORMAT)
+            except:
+                pass
+            conn.send(output)
+
+        if not secured:
+            conn.send(key)
 
     conn.close()
         
