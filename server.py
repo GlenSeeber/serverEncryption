@@ -81,7 +81,9 @@ def handle_client(conn, addr):
 
                 # should look like: 
                 # {"[some username]":"[some address]"}
-                userAddrBook.update({userAddr[0] : str(addr)})
+                print(userAddrBook)
+                userAddrBook.update({str(addr) : userAddr})
+                print(userAddrBook)
             #send the output
             try:
                 output = output.encode(FORMAT)
