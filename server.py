@@ -1,43 +1,98 @@
 import socket 
 import threading
+import base64
+import os
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 HEADER = 64
-PORT = 5050
+PORT = 5060
 # my linux laptop: 192.168.1.45
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = 'utf-8'
+KEY_REQUEST = '!SEND_KEY'
+KEY_CONFIRMED = '!KEY_CONFIRMED'
 DISCONNECT_MESSAGE = "!DISCONNECT"
+USERNAME_SET = "!USERNAME"
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind(ADDR)
 
+userAddrBook = {}
+
+def convert(string, breaker):
+    li = list(string.split(breaker))
+    return li
+
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
 
+    #have we set up encryption yet
+    secured = False
+    
     connected = True
     while connected:
-        msg_length = conn.recv(HEADER).decode(FORMAT)
-        if msg_length:
-            msg_length = int(msg_length)
-            msg = conn.recv(msg_length).decode(FORMAT)
-            if msg == DISCONNECT_MESSAGE:
-                #connected = False
-                break
+        output = 'DEFAULT_OUTPUT_MESSAGE'
 
-            print(f"[addr: {addr}] msg: {msg}")
+        #check for a header being sent every loop
+        msg_length = conn.recv(HEADER).decode(FORMAT)
+        # if we recieve a transmission
+        if msg_length:
+            #so that the server doesn't crash, it will just cleanly disconnect you
             try:
-                output = int(msg)
+                msg_length = int(msg_length)
             except:
-                if output != DISCONNECT_MESSAGE:
-                    output = "Error: not an integer"
-                else:
-                    output = 'huh'
-            else:
-                output *= output
-                output = str(output)
-            
-            conn.send(output.encode(FORMAT))
+                datatypeError = "incorrect data type sent, disconnecting from client"
+                print(datatypeError)
+                conn.send(datatypeError)
+                break
+            # recieve the message
+            msg = conn.recv(msg_length)
+            # decode if necessary
+            if secured:
+                msg = fernet.decrypt(msg)
+            msg = msg.decode(FORMAT)
+            # pull username from our address book dictionary
+            try:
+                username = userAddrBook[str(addr)]
+            except KeyError:
+                username = str(addr)
+            print(f"[Message Recieved ({username})] {msg}")
+            # disconnect
+            if msg == DISCONNECT_MESSAGE:
+                connected = False
+            # request key
+            elif msg == KEY_REQUEST:
+                key = Fernet.generate_key()
+                fernet = Fernet(key)
+                print(f"key generated:\n{key}\n")
+                output = key
+                # we will now be communicating exclusively through encrypted messages
+                secured = True
+            elif USERNAME_SET in msg:
+                # incoming message should look like:
+                # "!USERNAME::[some username]"
+
+                # seperate the actual content from the starting tag
+                userAddr = convert(msg, '::')[1]
+                print(f"userAddr: {userAddr} (ln 80)")     #debug
+
+                # should look like: 
+                # {"[some username]":"[some address]"}
+                print(userAddrBook)
+                userAddrBook.update({str(addr) : userAddr})
+                print(userAddrBook)
+            #send the output
+            try:
+                output = output.encode(FORMAT)
+            except:
+                pass
+            conn.send(output)
+
+        if not secured:
+            conn.send(key)
 
     conn.close()
         
