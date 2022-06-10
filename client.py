@@ -24,7 +24,15 @@ client.connect(ADDR)
 key = ''
 
 
-def send(msg, myKey=''):
+def send(msg, myKey):
+    # "why are you using myKey and key?"
+    # because at first we don't want to encrypt some messages.
+    # when global key gets set to msg recieve at the end of this func,
+    # we start passing key as the second argument of this func from then on.
+    # but we still need the ability to send non-encrypted messages to the server,
+    # thus we have the double variable.
+    # "Couldn't you just use a bool instead?"
+    # probably, but I have more important things to work on here at the moment
     global key
     global secured
     message = msg.encode(FORMAT)
@@ -49,6 +57,7 @@ def send(msg, myKey=''):
     if not secured:
         key = msgRecv
         secured = True
+    print(f"[SERVER] {msgRecv}")
     return msgRecv
 
 secured = False
@@ -56,9 +65,12 @@ secured = False
 connected = True
 while connected:
     if not secured:
+        # get the encryption key
         send(KEY_REQUEST)
         print(f"key:\n{key}")
         secured = True
+        # send a username
+        send(input("Select a username:\n> "))
     #once secured, start sending input() messages to server
     # get user input
     myMsg = input("Send Message:\n> ")

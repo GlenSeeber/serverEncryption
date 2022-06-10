@@ -49,7 +49,7 @@ def handle_client(conn, addr):
                 msg = fernet.decrypt(msg)
                 tags += 'DECRYPTED, '
             msg = msg.decode(FORMAT)
-            print(f"[Message Recieved ({tags})] {msg}")
+            print(f"[Message Recieved ({addr})] {msg}")
             # disconnect
             if msg == DISCONNECT_MESSAGE:
                 connected = False
