@@ -6,11 +6,13 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 HEADER = 64
-PORT = 5000
+PORT = 5060
 FORMAT = 'utf-8'
 KEY_REQUEST = '!SEND_KEY'
 KEY_CONFIRMED = '!KEY_CONFIRMED'
 DISCONNECT_MESSAGE = "!DISCONNECT"
+USERNAME_SET = "!USERNAME"
+
 # what is the IP address to the server you are connecting to?
 # if you're running this locally, you'll need the private IP
 # pull the ip from a file for an easy way to update it
@@ -65,12 +67,15 @@ secured = False
 connected = True
 while connected:
     if not secured:
-        # get the encryption key
-        send(KEY_REQUEST)
+        # get the encryption key, don't use a key to encrypt this message ('')
+        send(KEY_REQUEST, '')
         print(f"key:\n{key}")
         secured = True
         # send a username
-        send(input("Select a username:\n> "))
+        username = input("Select a username:\n> ")
+
+        # msg should look like: "!USERNAME::[some username]"
+        send(f"{USERNAME_SET}::{username}", key)
     #once secured, start sending input() messages to server
     # get user input
     myMsg = input("Send Message:\n> ")
@@ -81,4 +86,4 @@ while connected:
     # otherwise, send the message
     send(myMsg, key)
 
-input("you have been disconnected.")
+print("you have been disconnected.")
