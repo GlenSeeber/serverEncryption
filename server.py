@@ -5,9 +5,13 @@ import os
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import rsa
 
 HEADER = 64
-PORT = 5060
+# get the port from a file for easier changing
+with open('port.txt', 'r') as f:
+    PORT = int(f.read())
+
 # my linux laptop: 192.168.1.45
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
@@ -63,12 +67,23 @@ def handle_client(conn, addr):
             # disconnect
             if msg == DISCONNECT_MESSAGE:
                 connected = False
-            # request key
-            elif msg == KEY_REQUEST:
+            # request key. Client sends a public key for the server to
+            # encrypt the symmetric key with, sending it over securely.
+            elif KEY_REQUEST in msg:
+                pubKey = convert(msg, '::')[1]
+                pubKey = pubKey.encode()
+
+                print(f"public key recieved:\n{pubKey}\n")
+                
                 key = Fernet.generate_key()
                 fernet = Fernet(key)
-                print(f"key generated:\n{key}\n")
-                output = key
+
+                # encrypt the symmetric key using the public asymmetric key that
+                # the client sent us. (this codeline is using !!rsa NOT fernet!!)
+                print(f"\n\nKey: {key}\n")
+                print(f"\n\npubKey: {pubKey}\n")
+                output = rsa.encrypt(key, pubKey)
+
                 # we will now be communicating exclusively through encrypted messages
                 secured = True
             elif USERNAME_SET in msg:

@@ -4,9 +4,12 @@ import os
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import rsa
 
 HEADER = 64
-PORT = 5060
+# get the port from a file for easier changing
+with open('port.txt', 'r') as f:
+    PORT = int(f.read())
 FORMAT = 'utf-8'
 KEY_REQUEST = '!SEND_KEY'
 KEY_CONFIRMED = '!KEY_CONFIRMED'
@@ -26,7 +29,7 @@ client.connect(ADDR)
 key = ''
 
 
-def send(msg, myKey):
+def send(msg, myKey, type='rsa'):
     # "why are you using myKey and key?"
     # because at first we don't want to encrypt some messages.
     # when global key gets set to msg recieve at the end of this func,
@@ -42,8 +45,12 @@ def send(msg, myKey):
     #until it gets set
     if message == KEY_REQUEST:
         secured = False
-    #encrypt message if they passed an arg for key
-    if myKey != '':
+    #if we're using rsa (asymmetric)
+    if type == 'rsa':
+        #don't encrypt the message, we're sending a public Key
+        pass
+    # if we're using fernet (symmetric)
+    elif type == 'fernet':
         fernet = Fernet(myKey)
         message = fernet.encrypt(message)
     # create header
@@ -55,10 +62,12 @@ def send(msg, myKey):
     client.send(message)
     # recieve a message back from the server
     msgRecv = client.recv(2048).decode(FORMAT)
-    #reset the key if we request a new one
-    if not secured:
-        key = msgRecv
+    
+    if type == 'rsa':
+        key = rsa.decrypt(msgRecv, privKey)
         secured = True
+        type = 'fernet'
+
     print(f"[SERVER] {msgRecv}")
     return msgRecv
 
@@ -67,9 +76,12 @@ secured = False
 connected = True
 while connected:
     if not secured:
-        # get the encryption key, don't use a key to encrypt this message ('')
-        send(KEY_REQUEST, '')
-        print(f"key:\n{key}")
+        pubKey, privKey = rsa.newkeys(512)
+        #send the key request tag, along with the public (asymmetric) key for the server 
+        # to encrypt the symmetric key with, and send over to us.
+        send(f"{KEY_REQUEST}::{pubKey}", privKey)
+        print(f"public key:\n{pubKey}")
+
         secured = True
         # send a username
         username = input("Select a username:\n> ")
