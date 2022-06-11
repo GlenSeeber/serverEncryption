@@ -3,3 +3,5 @@ serverIP.txt
 port.txt
 
 bytesStr.py
+
+/__pycache__
