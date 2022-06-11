@@ -13,7 +13,7 @@ def encryptMsg(msg, pubKey):
     
     # convert msg to bytes if not already
     try:
-        msg = msg.encode()
+        msg = msg.encode(FORMAT)
     except AttributeError:
         pass
 

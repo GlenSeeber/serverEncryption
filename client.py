@@ -15,7 +15,7 @@ HEADER = 64
 # get the port from a file for easier changing
 with open('port.txt', 'r') as f:
     PORT = int(f.read())
-FORMAT = 'utf-8'
+FORMAT = 'ascii'
 KEY_REQUEST = '!SEND_KEY'
 KEY_CONFIRMED = '!KEY_CONFIRMED'
 DISCONNECT_MESSAGE = "!DISCONNECT"
@@ -34,7 +34,7 @@ client.connect(ADDR)
 symKey = ''
 
 
-def send(msg, myKey, type='rsa'):
+def send(msg, myKey):
     # "why are you using myKey and key?"
     # because at first we don't want to encrypt some messages.
     # when global key gets set to msg recieve at the end of this func,
@@ -48,14 +48,14 @@ def send(msg, myKey, type='rsa'):
     message = msg.encode(FORMAT)
     #tell the client that we're switching keys, so we're not secure
     #until it gets set
-    if message == KEY_REQUEST:
+    if message == KEY_REQUEST:      #[debug] this probably shouldn't exist, especially within send()
         secured = False
-    #if we're using rsa (asymmetric)
-    if type == 'rsa':
-        #don't encrypt the message, we're sending a public Key
+    #don't encrypt if we're sending an rsa key, or if we don't have a key to encrypt msg with
+    if myKey == None:
         pass
     # if we're using fernet (symmetric)
-    elif type == 'fernet':
+    else:
+        #encrypt using our key
         fernet = Fernet(myKey)
         message = fernet.encrypt(message)
     # create header
@@ -68,10 +68,13 @@ def send(msg, myKey, type='rsa'):
     # recieve a message back from the server
     msgRecv = client.recv(2048)
     
-    if type == 'rsa':
-        symKey = decryptMsg(msgRecv, privKey)
+    # if they don't have key (this is only the case if they're sending an rsa pubKey)
+    if myKey == None:
+        # decrypt the msgRecv from server using privKey, set the output as our symKey
+        symKey = decryptMsg(msgRecv, privKey).encode()
+        print(f"\nDecrypted symmetric Key:\n{symKey}\n\n")
         secured = True
-        type = 'fernet'
+        # make sure you only use fernet for encoding from here on out
 
     print(f"\n[SERVER] {msgRecv}\n\n")
     return msgRecv
@@ -88,10 +91,11 @@ while connected:
         pubKey = rsaKeys.publickey().export_key("OpenSSH")
         privKey = rsaKeys.export_key('PEM')
 
-        # send the key request tag, along with the public (asymmetric) key for the server 
-        # to encrypt the symmetric key with, and send over to us.
-        send(f"{KEY_REQUEST}::{pubKey.decode(FORMAT)}", symKey)
         print(f"public key:\n{pubKey}")
+        # Send the key request tag, along with the public (asymmetric) key for the server 
+        # to encrypt the symmetric key with. Pass None as the argument for key, since
+        # we aren't encrypting.
+        send(f"{KEY_REQUEST}::{pubKey.decode(FORMAT)}", None)
 
         secured = True
         # send a username

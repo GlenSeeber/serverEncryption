@@ -21,7 +21,7 @@ with open('port.txt', 'r') as f:
 # my linux laptop: 192.168.1.45
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
-FORMAT = 'utf-8'
+FORMAT = 'ascii'
 KEY_REQUEST = '!SEND_KEY'
 KEY_CONFIRMED = '!KEY_CONFIRMED'
 DISCONNECT_MESSAGE = "!DISCONNECT"
@@ -79,8 +79,6 @@ def handle_client(conn, addr):
                 pubKey = convert(msg, '::')[1]
                 pubKey = pubKey
 
-                print(f"\npublic key recieved:\n{pubKey}\n")
-                
                 # generate a symmetric key to send to the client using their public key
                 # we will switch to symmetric key encryption once the client has recieved
                 # our key
