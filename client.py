@@ -4,10 +4,18 @@ import os
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Random import get_random_bytes
+import rsa
+
+from debug import decryptMsg
 
 HEADER = 64
-PORT = 5060
-FORMAT = 'utf-8'
+# get the port from a file for easier changing
+with open('port.txt', 'r') as f:
+    PORT = int(f.read())
+FORMAT = 'ascii'
 KEY_REQUEST = '!SEND_KEY'
 KEY_CONFIRMED = '!KEY_CONFIRMED'
 DISCONNECT_MESSAGE = "!DISCONNECT"
@@ -23,7 +31,7 @@ ADDR = (SERVER, PORT)
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect(ADDR)
 
-key = ''
+symKey = ''
 
 
 def send(msg, myKey):
@@ -35,15 +43,19 @@ def send(msg, myKey):
     # thus we have the double variable.
     # "Couldn't you just use a bool instead?"
     # probably, but I have more important things to work on here at the moment
-    global key
+    global symKey
     global secured
     message = msg.encode(FORMAT)
     #tell the client that we're switching keys, so we're not secure
     #until it gets set
-    if message == KEY_REQUEST:
+    if message == KEY_REQUEST:      #[debug] this probably shouldn't exist, especially within send()
         secured = False
-    #encrypt message if they passed an arg for key
-    if myKey != '':
+    #don't encrypt if we're sending an rsa key, or if we don't have a key to encrypt msg with
+    if myKey == None:
+        pass
+    # if we're using fernet (symmetric)
+    else:
+        #encrypt using our key
         fernet = Fernet(myKey)
         message = fernet.encrypt(message)
     # create header
@@ -54,12 +66,17 @@ def send(msg, myKey):
     client.send(send_length)
     client.send(message)
     # recieve a message back from the server
-    msgRecv = client.recv(2048).decode(FORMAT)
-    #reset the key if we request a new one
-    if not secured:
-        key = msgRecv
+    msgRecv = client.recv(2048)
+    
+    # if they don't have key (this is only the case if they're sending an rsa pubKey)
+    if myKey == None:
+        # decrypt the msgRecv from server using privKey, set the output as our symKey
+        symKey = decryptMsg(msgRecv, privKey).encode()
+        print(f"\nDecrypted symmetric Key:\n{symKey}\n\n")
         secured = True
-    print(f"[SERVER] {msgRecv}")
+        # make sure you only use fernet for encoding from here on out
+
+    print(f"\n[SERVER] {msgRecv}\n\n")
     return msgRecv
 
 secured = False
@@ -67,15 +84,25 @@ secured = False
 connected = True
 while connected:
     if not secured:
-        # get the encryption key, don't use a key to encrypt this message ('')
-        send(KEY_REQUEST, '')
-        print(f"key:\n{key}")
+        # generate a private RSA key
+        rsaKeys = RSA.generate(2048, get_random_bytes)
+
+        # set key variables
+        pubKey = rsaKeys.publickey().export_key("OpenSSH")
+        privKey = rsaKeys.export_key('PEM')
+
+        print(f"public key:\n{pubKey}")
+        # Send the key request tag, along with the public (asymmetric) key for the server 
+        # to encrypt the symmetric key with. Pass None as the argument for key, since
+        # we aren't encrypting.
+        send(f"{KEY_REQUEST}::{pubKey.decode(FORMAT)}", None)
+
         secured = True
         # send a username
         username = input("Select a username:\n> ")
 
         # msg should look like: "!USERNAME::[some username]"
-        send(f"{USERNAME_SET}::{username}", key)
+        send(f"{USERNAME_SET}::{username}", symKey)
     #once secured, start sending input() messages to server
     # get user input
     myMsg = input("Send Message:\n> ")
@@ -84,6 +111,6 @@ while connected:
         connected = False
         myMsg = DISCONNECT_MESSAGE
     # otherwise, send the message
-    send(myMsg, key)
+    send(myMsg, symKey)
 
 print("you have been disconnected.")

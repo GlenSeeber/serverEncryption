@@ -5,13 +5,23 @@ import os
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Random import get_random_bytes
+
+#import rsa
+
+from debug import encryptMsg
 
 HEADER = 64
-PORT = 5060
+# get the port from a file for easier changing
+with open('port.txt', 'r') as f:
+    PORT = int(f.read())
+
 # my linux laptop: 192.168.1.45
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
-FORMAT = 'utf-8'
+FORMAT = 'ascii'
 KEY_REQUEST = '!SEND_KEY'
 KEY_CONFIRMED = '!KEY_CONFIRMED'
 DISCONNECT_MESSAGE = "!DISCONNECT"
@@ -63,12 +73,25 @@ def handle_client(conn, addr):
             # disconnect
             if msg == DISCONNECT_MESSAGE:
                 connected = False
-            # request key
-            elif msg == KEY_REQUEST:
-                key = Fernet.generate_key()
-                fernet = Fernet(key)
-                print(f"key generated:\n{key}\n")
-                output = key
+            # request key. Client sends a public key for the server to
+            # encrypt the symmetric key with, sending it over securely.
+            elif KEY_REQUEST in msg:
+                pubKey = convert(msg, '::')[1]
+                pubKey = pubKey
+
+                # generate a symmetric key to send to the client using their public key
+                # we will switch to symmetric key encryption once the client has recieved
+                # our key
+                symKey = Fernet.generate_key()
+                fernet = Fernet(symKey)
+
+                # encrypt sym key using pubKey
+                print(f"\n\nKey (the thing we're gonna send back to client): {symKey}\n")
+                print(f"\n\npubKey (what we're encrypting it with): {pubKey}\n")
+                output = encryptMsg(symKey, pubKey)
+                
+                print(f"\nEncrypted output: {output}\n\n")
+
                 # we will now be communicating exclusively through encrypted messages
                 secured = True
             elif USERNAME_SET in msg:
@@ -92,7 +115,7 @@ def handle_client(conn, addr):
             conn.send(output)
 
         if not secured:
-            conn.send(key)
+            conn.send(symKey)
 
     conn.close()
         
