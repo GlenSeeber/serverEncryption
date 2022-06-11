@@ -4,7 +4,12 @@ import os
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Random import get_random_bytes
 import rsa
+
+from debug import decryptMsg
 
 HEADER = 64
 # get the port from a file for easier changing
@@ -26,7 +31,7 @@ ADDR = (SERVER, PORT)
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect(ADDR)
 
-key = ''
+symKey = ''
 
 
 def send(msg, myKey, type='rsa'):
@@ -38,7 +43,7 @@ def send(msg, myKey, type='rsa'):
     # thus we have the double variable.
     # "Couldn't you just use a bool instead?"
     # probably, but I have more important things to work on here at the moment
-    global key
+    global symKey
     global secured
     message = msg.encode(FORMAT)
     #tell the client that we're switching keys, so we're not secure
@@ -61,14 +66,14 @@ def send(msg, myKey, type='rsa'):
     client.send(send_length)
     client.send(message)
     # recieve a message back from the server
-    msgRecv = client.recv(2048).decode(FORMAT)
+    msgRecv = client.recv(2048)
     
     if type == 'rsa':
-        key = rsa.decrypt(msgRecv, privKey)
+        symKey = decryptMsg(msgRecv, privKey)
         secured = True
         type = 'fernet'
 
-    print(f"[SERVER] {msgRecv}")
+    print(f"\n[SERVER] {msgRecv}\n\n")
     return msgRecv
 
 secured = False
@@ -76,10 +81,16 @@ secured = False
 connected = True
 while connected:
     if not secured:
-        pubKey, privKey = rsa.newkeys(512)
-        #send the key request tag, along with the public (asymmetric) key for the server 
+        # generate a private RSA key
+        rsaKeys = RSA.generate(2048, get_random_bytes)
+
+        # set key variables
+        pubKey = rsaKeys.publickey().export_key("OpenSSH")
+        privKey = rsaKeys.export_key('PEM')
+
+        # send the key request tag, along with the public (asymmetric) key for the server 
         # to encrypt the symmetric key with, and send over to us.
-        send(f"{KEY_REQUEST}::{pubKey}", privKey)
+        send(f"{KEY_REQUEST}::{pubKey.decode(FORMAT)}", symKey)
         print(f"public key:\n{pubKey}")
 
         secured = True
@@ -87,7 +98,7 @@ while connected:
         username = input("Select a username:\n> ")
 
         # msg should look like: "!USERNAME::[some username]"
-        send(f"{USERNAME_SET}::{username}", key)
+        send(f"{USERNAME_SET}::{username}", symKey)
     #once secured, start sending input() messages to server
     # get user input
     myMsg = input("Send Message:\n> ")
@@ -96,6 +107,6 @@ while connected:
         connected = False
         myMsg = DISCONNECT_MESSAGE
     # otherwise, send the message
-    send(myMsg, key)
+    send(myMsg, symKey)
 
 print("you have been disconnected.")

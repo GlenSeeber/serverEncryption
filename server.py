@@ -5,7 +5,13 @@ import os
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-import rsa
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Random import get_random_bytes
+
+#import rsa
+
+from debug import encryptMsg
 
 HEADER = 64
 # get the port from a file for easier changing
@@ -71,18 +77,22 @@ def handle_client(conn, addr):
             # encrypt the symmetric key with, sending it over securely.
             elif KEY_REQUEST in msg:
                 pubKey = convert(msg, '::')[1]
-                pubKey = pubKey.encode()
+                pubKey = pubKey
 
-                print(f"public key recieved:\n{pubKey}\n")
+                print(f"\npublic key recieved:\n{pubKey}\n")
                 
-                key = Fernet.generate_key()
-                fernet = Fernet(key)
+                # generate a symmetric key to send to the client using their public key
+                # we will switch to symmetric key encryption once the client has recieved
+                # our key
+                symKey = Fernet.generate_key()
+                fernet = Fernet(symKey)
 
-                # encrypt the symmetric key using the public asymmetric key that
-                # the client sent us. (this codeline is using !!rsa NOT fernet!!)
-                print(f"\n\nKey: {key}\n")
-                print(f"\n\npubKey: {pubKey}\n")
-                output = rsa.encrypt(key, pubKey)
+                # encrypt sym key using pubKey
+                print(f"\n\nKey (the thing we're gonna send back to client): {symKey}\n")
+                print(f"\n\npubKey (what we're encrypting it with): {pubKey}\n")
+                output = encryptMsg(symKey, pubKey)
+                
+                print(f"\nEncrypted output: {output}\n\n")
 
                 # we will now be communicating exclusively through encrypted messages
                 secured = True
@@ -107,7 +117,7 @@ def handle_client(conn, addr):
             conn.send(output)
 
         if not secured:
-            conn.send(key)
+            conn.send(symKey)
 
     conn.close()
         
