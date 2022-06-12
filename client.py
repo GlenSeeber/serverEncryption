@@ -30,6 +30,8 @@ ADDR = (SERVER, PORT)
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect(ADDR)
+# the local information about who this client is ('[IPv4]', [addr])
+localAddr = str(client)[95:119]
 
 symKey = ''
 
@@ -72,11 +74,18 @@ def send(msg, myKey):
     if myKey == None:
         # decrypt the msgRecv from server using privKey, set the output as our symKey
         symKey = decryptMsg(msgRecv, privKey).encode()
-        print(f"\nDecrypted symmetric Key:\n{symKey}\n\n")
         secured = True
         # make sure you only use fernet for encoding from here on out
 
-    print(f"\n[SERVER] {msgRecv}\n\n")
+    try:
+        username = username
+    except NameError:
+        username = localAddr
+
+    # log every transmission
+    with open('log.txt', 'a') as f:
+        f.write(f"[SERVER {username}]{msgRecv}\n")
+    
     return msgRecv
 
 secured = False
@@ -91,7 +100,6 @@ while connected:
         pubKey = rsaKeys.publickey().export_key("OpenSSH")
         privKey = rsaKeys.export_key('PEM')
 
-        print(f"public key:\n{pubKey}")
         # Send the key request tag, along with the public (asymmetric) key for the server 
         # to encrypt the symmetric key with. Pass None as the argument for key, since
         # we aren't encrypting.

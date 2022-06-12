@@ -2,6 +2,8 @@ serverIP.txt
 
 port.txt
 
+log.txt
+
 bytesStr.py
 
 __pycache__/

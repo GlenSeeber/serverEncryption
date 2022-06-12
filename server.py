@@ -69,7 +69,11 @@ def handle_client(conn, addr):
                 username = userAddrBook[str(addr)]
             except KeyError:
                 username = str(addr)
-            print(f"[Message Recieved ({username})] {msg}")
+
+            # log all messages
+            with open('log.txt', 'a') as f:
+                f.write(f"[{username}] {msg}\n")
+                
             # disconnect
             if msg == DISCONNECT_MESSAGE:
                 connected = False
@@ -81,17 +85,14 @@ def handle_client(conn, addr):
 
                 # generate a symmetric key to send to the client using their public key
                 # we will switch to symmetric key encryption once the client has recieved
-                # our key
+                # our ke
                 symKey = Fernet.generate_key()
                 fernet = Fernet(symKey)
 
                 # encrypt sym key using pubKey
-                print(f"\n\nKey (the thing we're gonna send back to client): {symKey}\n")
-                print(f"\n\npubKey (what we're encrypting it with): {pubKey}\n")
+                print("\nPublic key recieved! Now encrypting our symmetric key using the public key...\n")
                 output = encryptMsg(symKey, pubKey)
                 
-                print(f"\nEncrypted output: {output}\n\n")
-
                 # we will now be communicating exclusively through encrypted messages
                 secured = True
             elif USERNAME_SET in msg:
@@ -100,13 +101,10 @@ def handle_client(conn, addr):
 
                 # seperate the actual content from the starting tag
                 userAddr = convert(msg, '::')[1]
-                print(f"userAddr: {userAddr} (ln 80)")     #debug
 
                 # should look like: 
                 # {"[some username]":"[some address]"}
-                print(userAddrBook)
                 userAddrBook.update({str(addr) : userAddr})
-                print(userAddrBook)
             #send the output
             try:
                 output = output.encode(FORMAT)
@@ -123,6 +121,12 @@ def handle_client(conn, addr):
 def start():
     server.listen()
     print(f"[LISTENING] Server is listening on {SERVER}")
+
+    # wipe the logs
+    with open('log.txt', 'w') as f:
+        f.write('')
+    print("[LOGS] Wiped log.txt for new session")
+
     while True:
         conn, addr = server.accept()
         thread = threading.Thread(target=handle_client, args=(conn, addr))
@@ -130,5 +134,5 @@ def start():
         print(f"[ACTIVE CONNECTIONS] {threading.activeCount() - 1}")
 
 
-print("[STARTING] server is starting...")
+print("[STARTING] Server is starting...")
 start()
