@@ -82,9 +82,7 @@ def send(msg, myKey):
     except NameError:
         username = localAddr
 
-    # log every transmission
-    with open('log.txt', 'a') as f:
-        f.write(f"[SERVER {username}]{msgRecv}\n")
+
     
     return msgRecv
 

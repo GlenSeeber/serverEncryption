@@ -70,9 +70,9 @@ def handle_client(conn, addr):
             except KeyError:
                 username = str(addr)
 
-            # log all messages
+            # log messages the server recieves
             with open('log.txt', 'a') as f:
-                f.write(f"[{username}] {msg}\n")
+                f.write(f"[{username} -> SERVER] {msg}\n")
                 
             # disconnect
             if msg == DISCONNECT_MESSAGE:
@@ -111,6 +111,10 @@ def handle_client(conn, addr):
             except:
                 pass
             conn.send(output)
+            # log what the server sends out
+            with open('log.txt', 'a') as f:
+                f.write(f"[SERVER -> {username}] {output}\n")
+            
 
         if not secured:
             conn.send(symKey)
