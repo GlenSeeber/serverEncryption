@@ -37,14 +37,10 @@ symKey = ''
 
 
 def send(msg, myKey):
-    # "why are you using myKey and key?"
-    # because at first we don't want to encrypt some messages.
-    # when global key gets set to msg recieve at the end of this func,
-    # we start passing key as the second argument of this func from then on.
-    # but we still need the ability to send non-encrypted messages to the server,
-    # thus we have the double variable.
-    # "Couldn't you just use a bool instead?"
-    # probably, but I have more important things to work on here at the moment
+    # "why are you using myKey and symKey?"
+    # so we can send messages encrypted using RSA as well as using
+    # fernet (symmetric key). If you don't want to encrypt at all,
+    # pass myKey as None.
     global symKey
     global secured
     message = msg.encode(FORMAT)
@@ -76,16 +72,17 @@ def send(msg, myKey):
         symKey = decryptMsg(msgRecv, privKey).encode()
         secured = True
         # make sure you only use fernet for encoding from here on out
-
+    
+    # check if username exists, if not, create the var, set it to our address
     try:
         username = username
     except NameError:
         username = localAddr
 
 
-    
     return msgRecv
 
+# bool for if we have recieved the symmetric key from server yet
 secured = False
 
 connected = True
